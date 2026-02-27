@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    #resultList {
+      list-style-type: none; /* リストアイテムのマークを除去 */
+      padding: 0; /* パディングをなくす */
+    }
+  </style>
+  <script>
+    var currentFormattedDate; // 日付を保持する新しい変数
+    
+    function loadComboBox() {
+      google.script.run.withSuccessHandler(function(formattedDate) {
+        currentFormattedDate = formattedDate; // 日付を保持
+        google.script.run.withSuccessHandler(populateComboBox).getSheetNames(currentFormattedDate); // シート名を取得
+      }).getCurrentDate();
+    }
+
+    function populateComboBox(values) {
+      var comboBox = document.getElementById('myComboBox');
+      comboBox.innerHTML = ''; // 既存のオプションをクリア
+      
+      // プレースホルダーを追加
+      var placeholderOption = document.createElement('option');
+      placeholderOption.value = '';
+      placeholderOption.text = '選択してください';
+      comboBox.appendChild(placeholderOption); 
+
+      // シート名を追加
+      if (values.length === 0) {
+        document.getElementById('noDataMessage').textContent = '取り込みデータがありません';
+      } else {
+        document.getElementById('noDataMessage').textContent = ''; // メッセージをクリア
+
+        values.forEach(function(value) {
+          var option = document.createElement('option');
+          option.value = value;
+          option.text = value;
+          comboBox.appendChild(option);
+        });
+      }
+    }
+
+    function onComboBoxChange() {
+      var comboBox = document.getElementById('myComboBox');
+      var selectedValue = comboBox.value;
+      if (selectedValue && selectedValue !== '') {
+        google.script.run.withSuccessHandler(displayD8Values).getD8Values(selectedValue, currentFormattedDate);
+      } else {
+        document.getElementById('resultList').innerHTML = ''; // 選択されていない場合はリストをクリア
+      }
+    }
+
+    function displayD8Values(values) {
+      var resultList = document.getElementById('resultList');
+      resultList.innerHTML = ''; // 前のリストをクリア
+      
+      if (values.length > 0) {
+        values.forEach(function(row) {
+          // C列とD列の値を取得
+          var cValue = row[0]; // C列の値
+          var dValue = row[1]; // D列の値
+          var combinedValue = cValue + ' ' + dValue; // C列とD列を結合
+          
+          var button = document.createElement('button');
+          button.type = 'submit'; // ボタンを送信ボタンとして設定
+          button.className = 'btn btn-outline-primary btn-block'; // Bootstrap のクラスを追加して幅を修正
+          button.name = 'eiseikensa'; // フォームフィールドとしての名前を付ける
+          button.value = combinedValue; // ボタンの値に結合した値を設定
+          button.textContent = combinedValue; // ボタンのテキストとして結合した値を設定
+          
+          // ボタンがクリックされたときのイベントリスナーを追加
+          button.addEventListener('click', function() {
+            // クリックされたボタンの値を取得
+            var selectedValue = button.value.split(' '); // C列とD列の値を分ける
+          });
+
+          // ボタンをマウントするためのリストアイテムを作成
+          var listItem = document.createElement('li');
+          listItem.appendChild(button);
+          resultList.appendChild(listItem); // ボタンをリストに追加
+        });
+      }
+    }
+
+  </script>
+</head>
+<body onload="loadComboBox()" class="bg-light">
+  <form id="myForm" method="post" action="<?= deployURL ?>"> <!-- フォームを追加 -->
+    <div class="container">
+      <div class="row justify-content-center" style="margin-top: 50px;">
+        <div class="col-md-6">
+          <h1 class="text-center">衛生検査入力</h1>
+          <h4 class="text-center">該当の生産ラインを選択してください</h4>
+          <div class="form-group">
+            <select id="myComboBox" class="form-control" onchange="onComboBoxChange()">
+              <!-- 初期値は空のオプションとして設定 -->
+            </select>
+          </div>
+          <div style="color: red;" id="noDataMessage" class="text-center"></div> <!-- データがない場合のメッセージ表示エリア -->
+          <ul id="resultList" class="list-group" style="font-size: 1em;"></ul> <!-- ボタンのリスト -->
+        </div>
+      </div>
+    </div>
+  </form>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
