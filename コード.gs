@@ -6,6 +6,8 @@ function doGet(e) {
 }
 
 function doPost(e) {
+
+  if (e.parameter.eiseikensa) {
     const selectedValue = e.parameter.eiseikensa; // ボタンの値を取得
     const valueC = selectedValue.split(' ')[0]; // C列の値を取得
     const valueD = selectedValue.split(' ')[1]; // D列の値を取得
@@ -17,6 +19,15 @@ function doPost(e) {
     template.createSanitary = createSanitary(); // 他のデータも渡す
     const htmlOutput = template.evaluate();
     return htmlOutput;
+  }
+ 
+  if (e.parameter.modoru) {
+    const template = HtmlService.createTemplateFromFile('index');
+    template.deployURL = ScriptApp.getService().getUrl();
+    const htmlOutput = template.evaluate();
+    return htmlOutput;
+  } 
+
 }
 
 function getSheetNames(formattedDate) {

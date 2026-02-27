@@ -15,12 +15,13 @@
 <body>
     <div class="container" style="max-width: 1000px;">
         <h2 class="m-4 text-center">衛生検査記録簿</h2>
-        <form class="mb-5" method="POST" onsubmit="return confirmSubmission(event.submitter.name === 'modoru');">
+        <form class="mb-5" method="POST"  action="<?= deployURL ?>" onsubmit="return confirmSubmission(event.submitter.name === 'modoru');">
             <div class="text-center" style="margin-bottom: 20px;">
               <p style="margin-right: 20px; display: inline;"><strong>社員コード:</strong> <?= valueC ?></p>
               <p style="margin-right: 20px; display: inline;"><strong>氏名:</strong> <?= valueD ?></p>
               <input type="hidden" name="value" value="<?= valueC ?>">
               <input type="hidden" name="value" value="<?= valueD ?>">
+              <input type="hidden" name="modoru" value="true"> <!-- 戻るボタン用の隠しフィールド -->
             </div>
             <div class="text-center" style="margin-top: 20px; margin-bottom: 20px;">
                 <div style="text-align: left; display: inline-block; font-size: larger;">
