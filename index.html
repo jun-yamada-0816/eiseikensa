@@ -60,7 +60,7 @@ function loadComboBox() {
   }).getCurrentDate();
 }
 
-function populateComboBox(values, excludeValues) {
+function populateComboBox(values) {
   var comboBox = document.getElementById('myComboBox');
   comboBox.innerHTML = ''; // 既存のオプションをクリア
   
@@ -70,11 +70,6 @@ function populateComboBox(values, excludeValues) {
   placeholderOption.text = '選択してください';
   comboBox.appendChild(placeholderOption); 
 
-  // 除外する値の配列
-  var excludeValues = ['配置未定(当日欠勤者)', '他工場応援', '欠勤'];
-  // フォームのhiddenフィールドに除外値を設定
-  document.getElementById('excludeValues').value = JSON.stringify(excludeValues);
-
   // シート名を追加
   if (values.length === 0) {
     document.getElementById('noDataMessage').textContent = '取り込みデータがありません';
@@ -82,13 +77,11 @@ function populateComboBox(values, excludeValues) {
     document.getElementById('noDataMessage').textContent = ''; // メッセージをクリア
 
     values.forEach(function(value) {
-      // 除外する値に含まれていない場合のみオプションを追加
-      if (!excludeValues.includes(value)) {
-        var option = document.createElement('option');
-        option.value = value;
-        option.text = value;
-        comboBox.appendChild(option);
-      }
+      // すべてのシート名をオプションとして追加する
+      var option = document.createElement('option');
+      option.value = value;
+      option.text = value;
+      comboBox.appendChild(option);
     });
   }
 }
