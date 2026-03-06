@@ -162,14 +162,21 @@ function newsheet() {
     // A2から下のセルをクリア
     lineSheet.getRange('A2:A').clearContent();
 
+    // 除外する値の配列
+    const excludeValues = ['配置未定(当日欠勤者)', '他工場応援', '欠勤'];
+
     // シート名を書き込む
+    let rowIndex = 2; // 行のインデックス
     for (var i = 0; i < sheetNames.length; i++) {
-      lineSheet.getRange(i + 2, 1).setValue(sheetNames[i]);
+      // 書き込むシート名が除外値に含まれていないかをチェック
+      if (!excludeValues.includes(sheetNames[i])) {
+        lineSheet.getRange(rowIndex, 1).setValue(sheetNames[i]);
+        rowIndex++; // 書き込んだら行をインクリメント
+      }
     }
   } else {
     Logger.log("'ライン' sheet not found."); // シートが見つからない場合
   }
-
 
   // 今日の日付のシートを取得または作成
   const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d');
