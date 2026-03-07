@@ -4,10 +4,9 @@
   <base target="_top">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <style>
-    body { background-color: #f0f2f5; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    body { background-color: #f0f2f5; font-family: sans-serif; }
     .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .btn-person { text-align: left; padding: 12px 20px; font-weight: 600; transition: all 0.2s; border-radius: 8px; margin-bottom: 8px; }
-    .btn-person:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .btn-person { text-align: left; padding: 12px 20px; font-weight: 600; border-radius: 8px; margin-bottom: 8px; }
     .header-section { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 30px 0; border-radius: 0 0 20px 20px; margin-bottom: 30px; }
   </style>
   <script>
@@ -17,13 +16,10 @@
     function loadComboBox() {
       var comboBox = document.getElementById('myComboBox');
       comboBox.innerHTML = '<option value="">▼ ラインを選択してください</option>';
-      var excludeValues = ['配置未定(当日欠勤者)', '他工場応援', '欠勤'];
       lineNamesFromGas.forEach(function(val) {
-        if (!excludeValues.includes(val)) {
-          var opt = document.createElement('option');
-          opt.value = opt.text = val;
-          comboBox.appendChild(opt);
-        }
+        var opt = document.createElement('option');
+        opt.value = opt.text = val;
+        comboBox.appendChild(opt);
       });
     }
 
@@ -59,8 +55,8 @@
 </head>
 <body onload="loadComboBox()">
   <div class="header-section text-center">
-    <h2 class="font-weight-bold">衛生検査システム</h2>
-    <p class="mb-0 opacity-75">Hệ thống kiểm tra vệ sinh</p>
+    <h2 class="font-weight-bold">衛生検査入力</h2>
+    <p class="mb-0 opacity-75 small">Hệ thống kiểm tra vệ sinh</p>
   </div>
   <div class="container pb-5">
     <div class="row justify-content-center">
