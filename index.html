@@ -10,23 +10,33 @@
     .header-section { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 30px 0; border-radius: 0 0 20px 20px; margin-bottom: 30px; }
   </style>
   <script>
-    var lineNamesFromGas = <?!= JSON.stringify(lineNames) ?>;
-    var currentFormattedDate = "<?= initDate ?>"; 
+    // undefined 対策を施した初期化
+    var rawLines = <?!= JSON.stringify(lineNames) ?>;
+    var lineNamesFromGas = rawLines ? rawLines : [];
+    
+    var rawDate = "<?= initDate ?>";
+    var currentFormattedDate = (rawDate === "undefined" || !rawDate) ? "" : rawDate; 
     
     function loadComboBox() {
       var comboBox = document.getElementById('myComboBox');
       comboBox.innerHTML = '<option value="">▼ ラインを選択してください</option>';
-      lineNamesFromGas.forEach(function(val) {
-        var opt = document.createElement('option');
-        opt.value = opt.text = val;
-        comboBox.appendChild(opt);
-      });
+      
+      if (Array.isArray(lineNamesFromGas)) {
+        var excludeValues = ['配置未定(当日欠勤者)', '他工場応援', '欠勤'];
+        lineNamesFromGas.forEach(function(val) {
+          if (val && !excludeValues.includes(val)) {
+            var opt = document.createElement('option');
+            opt.value = opt.text = val;
+            comboBox.appendChild(opt);
+          }
+        });
+      }
     }
 
     function onComboBoxChange() {
       var val = document.getElementById('myComboBox').value;
       var list = document.getElementById('resultList');
-      list.innerHTML = '<div class="text-center p-4 text-muted">読み込み中...</div>';
+      list.innerHTML = '<div class="text-center p-4 text-muted small">読み込み中...</div>';
       if (val) {
         google.script.run.withSuccessHandler(displayD8Values).getD8Values(val, currentFormattedDate);
       } else {
@@ -37,7 +47,7 @@
     function displayD8Values(values) {
       var list = document.getElementById('resultList');
       list.innerHTML = '';
-      if (values.length > 0) {
+      if (values && values.length > 0) {
         values.forEach(function(row) {
           var btn = document.createElement('button');
           btn.type = 'submit';
@@ -48,7 +58,7 @@
           list.appendChild(btn);
         });
       } else {
-        list.innerHTML = '<div class="alert alert-warning">メンバーが見つかりませんでした</div>';
+        list.innerHTML = '<div class="alert alert-warning small">対象者が見つかりませんでした</div>';
       }
     }
   </script>
