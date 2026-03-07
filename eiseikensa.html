@@ -13,7 +13,7 @@
     <div class="container-fluid p-0">
         <div class="bg-primary text-white text-center py-4 mb-4">
             <h4 class="mb-1 font-weight-bold">衛生検査記録簿</h4>
-            <div class="opacity-75" style="font-size:0.9rem text-white-50">Sổ ghi chép kiểm tra vệ sinh</div>
+            <div class="opacity-75" style="font-size:0.9rem">Sổ ghi chép kiểm tra vệ sinh</div>
         </div>
         
         <div class="container mb-5">
@@ -32,8 +32,8 @@
                         </div>
                     </div>
                     
-                    <input type="hidden" name="valueC" value="<?= valueC ?>">
-                    <input type="hidden" name="valueD" value="<?= valueD ?>">
+                    <input type="hidden" name="valueC" value="<?= (valueC === undefined) ? '' : valueC ?>">
+                    <input type="hidden" name="valueD" value="<?= (valueD === undefined) ? '' : valueD ?>">
                     
                     <div>
                         <?!= createSanitary ?>
