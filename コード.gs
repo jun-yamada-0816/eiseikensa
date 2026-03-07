@@ -5,9 +5,12 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('index');
   template.deployURL = ScriptApp.getService().getUrl();
   
-  // 表示速度向上のため、事前にライン名と日付を埋め込む
-  template.lineNames = getlineNames(); 
-  template.initDate = getCurrentDate();
+  // 事前にライン名と日付を埋め込む（undefined対策）
+  const lines = getlineNames();
+  template.lineNames = lines ? lines : []; 
+  
+  const date = getCurrentDate();
+  template.initDate = date ? date : "";
   
   const htmlOutput = template.evaluate();
   return htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -19,9 +22,9 @@ function doGet(e) {
 function doPost(e) {
   // 従業員選択後の検査画面表示
   if (e.parameter.eiseikensa) {
-    const selectedValue = e.parameter.eiseikensa;
-    const valueC = selectedValue.split(' ')[0];
-    const valueD = selectedValue.split(' ')[1];
+    const selectedValue = e.parameter.eiseikensa || "";
+    const valueC = selectedValue.split(' ')[0] || "";
+    const valueD = selectedValue.split(' ')[1] || "";
     const template = HtmlService.createTemplateFromFile('eiseikensa');
     template.deployURL = ScriptApp.getService().getUrl();
 
@@ -72,10 +75,10 @@ function doPost(e) {
       if (masterRow) masterSheet.getRange(masterRow.getRow(), 3).setValue('〇');
     }
 
-    // index画面に戻る
     const template = HtmlService.createTemplateFromFile('index');
     template.deployURL = ScriptApp.getService().getUrl();
-    template.lineNames = getlineNames(); 
+    const lines = getlineNames();
+    template.lineNames = lines ? lines : []; 
     template.initDate = getCurrentDate();
     return template.evaluate().addMetaTag('viewport', 'width=device-width, initial-scale=1');
   } 
@@ -87,22 +90,22 @@ function showDatePicker() {
   const html = HtmlService.createHtmlOutput(`
     <div style="font-family:sans-serif; padding:10px;">
       <p>日付を選択して実行してください</p>
-      <input type="date" id="dateInput" class="form-control" style="width:100%; margin-bottom:10px;">
-      <button onclick="submitDate()" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:4px; width:100%;">実行</button>
+      <input type="date" id="dateInput" style="width:100%; margin-bottom:10px; padding:5px;">
+      <button onclick="submitDate()" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:4px; width:100%; cursor:pointer;">実行</button>
       <div id="progressMessage" style="margin-top: 10px; font-size:0.9rem; color:#666;"></div>
     </div>
     <script>
       function submitDate() {
-        const datePickerValue = document.getElementById('dateInput').value;
-        const progressMessage = document.getElementById('progressMessage');
-        if (datePickerValue) {
-          progressMessage.textContent = '外部ファイルからデータ取得中...';
-          const dateObj = new Date(datePickerValue);
-          const formattedDate = dateObj.getFullYear() + '-' + (dateObj.getMonth() + 1) + '-' + dateObj.getDate();
+        const val = document.getElementById('dateInput').value;
+        const msg = document.getElementById('progressMessage');
+        if (val) {
+          msg.textContent = 'データ取得中...';
+          const d = new Date(val);
+          const f = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
           google.script.run.withSuccessHandler(function() {
-            progressMessage.textContent = '完了しました！';
+            msg.textContent = '完了しました！';
             setTimeout(() => google.script.host.close(), 1000);
-          }).newsheet(formattedDate);
+          }).newsheet(f);
         }
       }
     </script>
@@ -127,78 +130,61 @@ function newsheet(manualDate) {
     }
   }
 
-  // 今日のシート準備
   const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d');
   let dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(today);
   if (!dataSheet) {
       const emptySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('空');
-      if (emptySheet) {
-          dataSheet = emptySheet.copyTo(SpreadsheetApp.getActiveSpreadsheet()).setName(today);
-      }
+      if (emptySheet) dataSheet = emptySheet.copyTo(SpreadsheetApp.getActiveSpreadsheet()).setName(today);
   }
 
-  // マスターのクリア
   if (dataSheet) {
-    const employeeMasterSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('社員マスタ');
-    if (employeeMasterSheet) {
-        const lastRow = employeeMasterSheet.getLastRow();
-        if (lastRow >= 2) {
-            employeeMasterSheet.getRange(2, 3, lastRow - 1).clearContent();
-        }
+    const master = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('社員マスタ');
+    if (master) {
+        const lastRow = master.getLastRow();
+        if (lastRow >= 2) master.getRange(2, 3, lastRow - 1).clearContent();
     }
   }
 
-  // 外部フォルダからの情報同期
-  const excludeValuesForSync = ['配置未定(当日欠勤者)', '他工場応援', '欠勤'];
   const folderId = '1WR0pparjXhq7eLUGMPsbOO8WxB7RwCl1';
   const files = DriveApp.getFolderById(folderId).getFilesByName('080_' + formattedDate + '_作業時間管理書');
-  
   while (files.hasNext()) {
     const spreadsheet = SpreadsheetApp.open(files.next());
-    const sheets = spreadsheet.getSheets();
-    for (let i = 0; i < sheets.length; i++) {
-      const sheet = sheets[i];
-      const sheetName = sheet.getName();
-      if (excludeValuesForSync.includes(sheetName)) {
-        const values = sheet.getRange('C8:C' + sheet.getLastRow()).getValues();
-        const cleanedValues = values.flat().map(v => v.toString().replace(/^0+/, ''));
+    spreadsheet.getSheets().forEach(sheet => {
+      const name = sheet.getName();
+      const excludes = ['配置未定(当日欠勤者)', '他工場応援', '欠勤'];
+      if (excludes.includes(name)) {
+        const vals = sheet.getRange('C8:C' + sheet.getLastRow()).getValues();
+        const cleaned = vals.flat().map(v => v.toString().replace(/^0+/, ''));
         const masterSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('社員マスタ');
-        if (masterSheet.getFilter()) masterSheet.getFilter().remove();
-        const masterData = masterSheet.getRange('A:A').getValues();
-
-        for (let j = 0; j < cleanedValues.length; j++) {
-          const employeeId = cleanedValues[j];
-          for (let k = 0; k < masterData.length; k++) {
-            if (masterData[k][0] == employeeId) {
-                const writeValue = (sheetName == '配置未定(当日欠勤者)') ? '当欠' : (sheetName == '他工場応援' ? '応援' : '欠勤');
-                masterSheet.getRange(k + 1, 3).setValue(writeValue);
+        const mData = masterSheet.getRange('A:A').getValues();
+        cleaned.forEach(id => {
+          for (let k = 0; k < mData.length; k++) {
+            if (mData[k][0] == id) {
+                const wVal = (name == '配置未定(当日欠勤者)') ? '当欠' : (name == '他工場応援' ? '応援' : '欠勤');
+                masterSheet.getRange(k + 1, 3).setValue(wVal);
                 break;
             }
           }
-        }
+        });
       }
-    }
+    });
   } 
 }
 
 function getSheetNames(formattedDate) {
-  const sheetNames = [];
+  const names = [];
   const files = DriveApp.getFolderById('1WR0pparjXhq7eLUGMPsbOO8WxB7RwCl1').getFilesByName('080_' + formattedDate + '_作業時間管理書');
   while (files.hasNext()) {
-    const spreadsheet = SpreadsheetApp.open(files.next());
-    spreadsheet.getSheets().forEach(s => sheetNames.push(s.getName()));
+    SpreadsheetApp.open(files.next()).getSheets().forEach(s => names.push(s.getName()));
   }
-  return Array.from(new Set(sheetNames));
+  return Array.from(new Set(names));
 }
 
 function getD8Values(sheetName, formattedDate) {
   const files = DriveApp.getFolderById('1WR0pparjXhq7eLUGMPsbOO8WxB7RwCl1').getFilesByName('080_' + formattedDate + '_作業時間管理書');
   if (files.hasNext()) {
     const sheet = SpreadsheetApp.open(files.next()).getSheetByName(sheetName);
-    if (sheet) {
-      const range = sheet.getRange('C8:D' + sheet.getLastRow());
-      return range.getValues().filter(r => r[0] && r[1]);
-    }
+    if (sheet) return sheet.getRange('C8:D' + sheet.getLastRow()).getValues().filter(r => r[0] && r[1]);
   }
   return [];
 }
@@ -217,8 +203,12 @@ function createSanitary(employeeData) {
   let idx = 0;
   const hasData = Array.isArray(employeeData) && employeeData.length > 0;
   const items = Array.from({length: 26}, () => hasData ? employeeData[idx++] === '✔' : false);
-  const t1 = hasData ? employeeData[idx++] : '';
-  const t2 = hasData ? employeeData[idx++] : '';
+  
+  // undefined 対策
+  let t1 = hasData ? employeeData[idx++] : '';
+  let t2 = hasData ? employeeData[idx++] : '';
+  t1 = (t1 === undefined || t1 === null || t1 === "undefined") ? "" : t1;
+  t2 = (t2 === undefined || t2 === null || t2 === "undefined") ? "" : t2;
 
   const labels = [
     ["手洗い・ローラー掛を実施した", "Đã thực hiện rửa tay/con lăn"],
@@ -231,7 +221,7 @@ function createSanitary(employeeData) {
     ["下痢・吐き気がある", "Tiêu chảy/buồn nôn"],
     ["手指怪我がある", "Có thương tích ở tay"],
     ["歯科治療 治療中", "Đang điều trị nha khoa"],
-    ["歯科治療 異常がない", "Không có bất thường nha khoa"],
+    ["歯科治療 異常がない", "Không có bất異常 nha khoa"],
     ["黄疸がある", "Có dấu hiệu vàng da"],
     ["目、鼻分泌物がある", "Có chất nhầy ở mắt/mũi"],
     ["その他風邪の症状がある", "Triệu chứng cảm cúm khác"],
