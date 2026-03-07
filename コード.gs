@@ -1,13 +1,23 @@
+/**
+ * Webアプリの初期表示
+ */
 function doGet(e) {
   const template = HtmlService.createTemplateFromFile('index');
   template.deployURL = ScriptApp.getService().getUrl();
+  
+  // 表示速度向上のため、事前にライン名と日付を埋め込む
   template.lineNames = getlineNames(); 
   template.initDate = getCurrentDate();
+  
   const htmlOutput = template.evaluate();
   return htmlOutput.addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+/**
+ * フォーム送信時の処理
+ */
 function doPost(e) {
+  // 従業員選択後の検査画面表示
   if (e.parameter.eiseikensa) {
     const selectedValue = e.parameter.eiseikensa;
     const valueC = selectedValue.split(' ')[0];
@@ -37,6 +47,7 @@ function doPost(e) {
     return template.evaluate().addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
 
+  // データ登録、または戻るボタン
   if (e.parameter.submit || e.parameter.modoru) {
     if (e.parameter.submit) {
       const valueC = e.parameter.valueC;
@@ -61,6 +72,7 @@ function doPost(e) {
       if (masterRow) masterSheet.getRange(masterRow.getRow(), 3).setValue('〇');
     }
 
+    // index画面に戻る
     const template = HtmlService.createTemplateFromFile('index');
     template.deployURL = ScriptApp.getService().getUrl();
     template.lineNames = getlineNames(); 
@@ -69,7 +81,128 @@ function doPost(e) {
   } 
 }
 
-// --- 共通ロジック ---
+// --- ユーティリティ・準備用関数 ---
+
+function showDatePicker() {
+  const html = HtmlService.createHtmlOutput(`
+    <div style="font-family:sans-serif; padding:10px;">
+      <p>日付を選択して実行してください</p>
+      <input type="date" id="dateInput" class="form-control" style="width:100%; margin-bottom:10px;">
+      <button onclick="submitDate()" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:4px; width:100%;">実行</button>
+      <div id="progressMessage" style="margin-top: 10px; font-size:0.9rem; color:#666;"></div>
+    </div>
+    <script>
+      function submitDate() {
+        const datePickerValue = document.getElementById('dateInput').value;
+        const progressMessage = document.getElementById('progressMessage');
+        if (datePickerValue) {
+          progressMessage.textContent = '外部ファイルからデータ取得中...';
+          const dateObj = new Date(datePickerValue);
+          const formattedDate = dateObj.getFullYear() + '-' + (dateObj.getMonth() + 1) + '-' + dateObj.getDate();
+          google.script.run.withSuccessHandler(function() {
+            progressMessage.textContent = '完了しました！';
+            setTimeout(() => google.script.host.close(), 1000);
+          }).newsheet(formattedDate);
+        }
+      }
+    </script>
+  `).setWidth(300).setHeight(200);
+  SpreadsheetApp.getUi().showModalDialog(html, 'データ準備');
+}
+
+function newsheet(manualDate) {
+  const formattedDate = manualDate || getCurrentDate();
+  const sheetNames = getSheetNames(formattedDate);
+  const lineSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ライン');
+  
+  if (lineSheet) {
+    lineSheet.getRange('A2:A').clearContent();
+    const excludeValues = ['配置未定(当日欠勤者)', '他工場応援', '欠勤'];
+    let rowIndex = 2;
+    for (var i = 0; i < sheetNames.length; i++) {
+      if (!excludeValues.includes(sheetNames[i])) {
+        lineSheet.getRange(rowIndex, 1).setValue(sheetNames[i]);
+        rowIndex++;
+      }
+    }
+  }
+
+  // 今日のシート準備
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d');
+  let dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(today);
+  if (!dataSheet) {
+      const emptySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('空');
+      if (emptySheet) {
+          dataSheet = emptySheet.copyTo(SpreadsheetApp.getActiveSpreadsheet()).setName(today);
+      }
+  }
+
+  // マスターのクリア
+  if (dataSheet) {
+    const employeeMasterSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('社員マスタ');
+    if (employeeMasterSheet) {
+        const lastRow = employeeMasterSheet.getLastRow();
+        if (lastRow >= 2) {
+            employeeMasterSheet.getRange(2, 3, lastRow - 1).clearContent();
+        }
+    }
+  }
+
+  // 外部フォルダからの情報同期
+  const excludeValuesForSync = ['配置未定(当日欠勤者)', '他工場応援', '欠勤'];
+  const folderId = '1WR0pparjXhq7eLUGMPsbOO8WxB7RwCl1';
+  const files = DriveApp.getFolderById(folderId).getFilesByName('080_' + formattedDate + '_作業時間管理書');
+  
+  while (files.hasNext()) {
+    const spreadsheet = SpreadsheetApp.open(files.next());
+    const sheets = spreadsheet.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      const sheet = sheets[i];
+      const sheetName = sheet.getName();
+      if (excludeValuesForSync.includes(sheetName)) {
+        const values = sheet.getRange('C8:C' + sheet.getLastRow()).getValues();
+        const cleanedValues = values.flat().map(v => v.toString().replace(/^0+/, ''));
+        const masterSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('社員マスタ');
+        if (masterSheet.getFilter()) masterSheet.getFilter().remove();
+        const masterData = masterSheet.getRange('A:A').getValues();
+
+        for (let j = 0; j < cleanedValues.length; j++) {
+          const employeeId = cleanedValues[j];
+          for (let k = 0; k < masterData.length; k++) {
+            if (masterData[k][0] == employeeId) {
+                const writeValue = (sheetName == '配置未定(当日欠勤者)') ? '当欠' : (sheetName == '他工場応援' ? '応援' : '欠勤');
+                masterSheet.getRange(k + 1, 3).setValue(writeValue);
+                break;
+            }
+          }
+        }
+      }
+    }
+  } 
+}
+
+function getSheetNames(formattedDate) {
+  const sheetNames = [];
+  const files = DriveApp.getFolderById('1WR0pparjXhq7eLUGMPsbOO8WxB7RwCl1').getFilesByName('080_' + formattedDate + '_作業時間管理書');
+  while (files.hasNext()) {
+    const spreadsheet = SpreadsheetApp.open(files.next());
+    spreadsheet.getSheets().forEach(s => sheetNames.push(s.getName()));
+  }
+  return Array.from(new Set(sheetNames));
+}
+
+function getD8Values(sheetName, formattedDate) {
+  const files = DriveApp.getFolderById('1WR0pparjXhq7eLUGMPsbOO8WxB7RwCl1').getFilesByName('080_' + formattedDate + '_作業時間管理書');
+  if (files.hasNext()) {
+    const sheet = SpreadsheetApp.open(files.next()).getSheetByName(sheetName);
+    if (sheet) {
+      const range = sheet.getRange('C8:D' + sheet.getLastRow());
+      return range.getValues().filter(r => r[0] && r[1]);
+    }
+  }
+  return [];
+}
+
 function getCurrentDate() {
   const t = new Date();
   return t.getFullYear() + '-' + (t.getMonth() + 1) + '-' + t.getDate();
@@ -78,15 +211,6 @@ function getCurrentDate() {
 function getlineNames() {
   const s = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ライン');
   return s && s.getLastRow() >= 2 ? s.getRange('A2:A' + s.getLastRow()).getValues().flat() : [];
-}
-
-function getD8Values(sheetName, formattedDate) {
-  const files = DriveApp.getFolderById('1WR0pparjXhq7eLUGMPsbOO8WxB7RwCl1').getFilesByName('080_' + formattedDate + '_作業時間管理書');
-  if (files.hasNext()) {
-    const sheet = SpreadsheetApp.open(files.next()).getSheetByName(sheetName);
-    if (sheet) return sheet.getRange('C8:D' + sheet.getLastRow()).getValues().filter(r => r[0] && r[1]);
-  }
-  return [];
 }
 
 function createSanitary(employeeData) {
